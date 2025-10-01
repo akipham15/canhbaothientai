@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giám Sát Mực Nước</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #e0f2fe 0%, #cffafe 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        #app {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .icon-box {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            padding: 12px;
+            border-radius: 12px;
+            color: white;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .last-update {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card.blue {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+        }
+
+        .stat-card.cyan {
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+            color: white;
+        }
+
+        .stat-card.teal {
+            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+            color: white;
+        }
+
+        .stat-card.green {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .stat-card.yellow {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .stat-card.orange {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: white;
+        }
+
+        .stat-card.red {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .alert-level {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .alert-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+        }
+
+        .alert-icon.safe { background-color: #10b981; }
+        .alert-icon.warning { background-color: #f59e0b; }
+        .alert-icon.danger { background-color: #ef4444; }
+        .alert-icon.critical { background-color: #dc2626; }
+
+        .alert-legend {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .alert-legend h3 {
+            margin-bottom: 15px;
+            color: #1f2937;
+            font-size: 18px;
+        }
+
+        .legend-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border-left: 4px solid transparent;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .legend-color.green { background-color: #10b981; }
+        .legend-color.yellow { background-color: #f59e0b; }
+        .legend-color.orange { background-color: #f97316; }
+        .legend-color.red { background-color: #ef4444; }
+
+        .cors-notice {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .notice-header h3 {
+            margin: 0 0 12px 0;
+            color: #92400e;
+            font-size: 18px;
+        }
+
+        .notice-content p {
+            margin: 0 0 12px 0;
+            color: #92400e;
+            line-height: 1.5;
+        }
+
+        .notice-content ul {
+            margin: 0 0 16px 0;
+            padding-left: 20px;
+        }
+
+        .notice-content li {
+            margin-bottom: 8px;
+            color: #92400e;
+        }
+
+        .cors-solutions {
+            background: #fef7cd;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .cors-solutions h4 {
+            margin: 0 0 8px 0;
+            color: #92400e;
+            font-size: 14px;
+        }
+
+        .cors-solutions ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .cors-solutions li {
+            margin-bottom: 4px;
+            color: #92400e;
+            font-size: 13px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .chart-wrapper {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 16px;
+            position: relative;
+            height: 400px;
+        }
+
+        .loading,
+        .error {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 400px;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .error-icon {
+            width: 64px;
+            height: 64px;
+            background: #fee2e2;
+            color: #dc2626;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 16px;
+        }
+
+        .info-box {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+        }
+
+        .info-box h2 {
+            font-size: 18px;
+            color: #1f2937;
+            margin-bottom: 16px;
+        }
+
+        .info-list {
+            list-style: none;
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .info-list li {
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .info-list li:before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #3b82f6;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .chart-wrapper {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div class="header">
+            <div class="header-content">
+                <div class="header-title">
+                    <div class="icon-box">
+                        <svg width="28" height="28" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h1>Giám Sát Mực Nước</h1>
+                        <p class="subtitle">Trạm F01559 - Cập nhật theo phút</p>
+                    </div>
+                </div>
+                <div class="last-update" v-if="lastUpdate">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" />
+                        <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" fill="none" />
+                    </svg>
+                    <span>Cập nhật: {{ lastUpdate }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card blue">
+                <div class="stat-label">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
+                    </svg>
+                    Mực nước hiện tại
+                </div>
+                <div class="stat-value">{{ currentLevel }} cm</div>
+            </div>
+            
+            <div class="stat-card" :class="alertLevel.color">
+                <div class="stat-label">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                    </svg>
+                    Mức báo động
+                </div>
+                <div class="alert-level">
+                    <div class="alert-icon" :class="alertLevel.level">
+                        {{ alertLevel.icon }}
+                    </div>
+                    <span>{{ alertLevel.message }}</span>
+                </div>
+            </div>
+
+            
+            <div class="stat-card teal">
+                <div class="stat-label">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" />
+                        <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" fill="none" />
+                    </svg>
+                    Số điểm dữ liệu
+                </div>
+                <div class="stat-value">{{ dataPoints }}</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-wrapper">
+                <div v-if="loading && data.length === 0" class="loading">
+                    <div class="spinner"></div>
+                    <p style="color: #6b7280;">Đang tải dữ liệu...</p>
+                </div>
+                <div v-else-if="error && data.length === 0" class="error">
+                    <div class="error-icon">!</div>
+                    <p style="color: #6b7280;">{{ error }}</p>
+                    <button @click="fetchWaterLevel" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-top: 12px;" :disabled="loading">
+                        {{ loading ? 'Đang thử lại...' : 'Thử lại' }}
+                    </button>
+                </div>
+                <canvas ref="chartCanvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Alert Level Legend -->
+        <div class="alert-legend">
+            <h3>Mức báo động</h3>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-color green"></div>
+                    <span>An toàn (< 950cm)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color yellow"></div>
+                    <span>Cảnh báo (950-1050cm)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color orange"></div>
+                    <span>Nguy hiểm (1050-1150cm)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color red"></div>
+                    <span>Cực kỳ nguy hiểm (> 1150cm)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h2>Thông tin</h2>
+            <ul class="info-list">
+                <li>Dữ liệu được cập nhật tự động mỗi phút</li>
+                <li>Biểu đồ hiển thị tối đa 60 điểm dữ liệu gần nhất (1 giờ)</li>
+                <li>Nguồn dữ liệu: Hệ thống phòng chống thiên tai Hà Nội</li>
+            </ul>
+        </div>
+
+        <!-- CORS Notice -->
+        <div class="cors-notice" v-if="error && error.includes('CORS')">
+            <div class="notice-header">
+                <h3>⚠️ Lưu ý về CORS</h3>
+            </div>
+            <div class="notice-content">
+                <p>Website này sử dụng CORS proxy để lấy dữ liệu từ server. Nếu gặp lỗi CORS, bạn có thể:</p>
+                <ul>
+                    <li><strong>Thử refresh trang</strong> - Các proxy khác nhau có thể hoạt động</li>
+                    <li><strong>Sử dụng dữ liệu mẫu</strong> - Website sẽ tự động chuyển sang dữ liệu demo</li>
+                    <li><strong>Chạy local server</strong> - Mở file qua localhost thay vì file://</li>
+                </ul>
+                <div class="cors-solutions">
+                    <h4>Giải pháp kỹ thuật:</h4>
+                    <ol>
+                        <li>Deploy lên server có hỗ trợ CORS</li>
+                        <li>Sử dụng backend proxy</li>
+                        <li>Cấu hình CORS headers trên server nguồn</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        const { createApp, ref, computed, onMounted, onBeforeUnmount, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                // Reactive data
+                const data = ref([]);
+                const loading = ref(true);
+                const error = ref(null);
+                const lastUpdate = ref(null);
+                const chart = ref(null);
+                const isUpdatingChart = ref(false);
+                const dataInterval = ref(null);
+                const chartCanvas = ref(null);
+
+                // Computed properties
+                const currentLevel = computed(() => {
+                    if (data.value.length === 0) return '--';
+                    const latestRecord = data.value[data.value.length - 1];
+                    return latestRecord.level.toFixed(2);
+                });
+
+                const dataPoints = computed(() => {
+                    return data.value.length;
+                });
+
+                const alertLevel = computed(() => {
+                    if (data.value.length === 0) return { level: 'unknown', color: 'blue', icon: '?', message: 'Không có dữ liệu' };
+                    
+                    const level = data.value[data.value.length - 1].level;
+                    
+                    // Định nghĩa các mức báo động theo yêu cầu
+                    if (level < 950) {
+                        return { level: 'safe', color: 'green', icon: '✓', message: 'An toàn' };
+                    } else if (level < 1050) {
+                        return { level: 'warning', color: 'yellow', icon: '⚠', message: 'Cảnh báo' };
+                    } else if (level < 1150) {
+                        return { level: 'danger', color: 'orange', icon: '⚠', message: 'Nguy hiểm' };
+                    } else {
+                        return { level: 'critical', color: 'red', icon: '🚨', message: 'Cực kỳ nguy hiểm' };
+                    }
+                });
+
+                // Methods
+                const fetchWaterLevel = async () => {
+                    console.log('fetchWaterLevel called');
+                    
+                    // Danh sách các CORS proxy để thử
+                    const corsProxies = [
+                        'https://api.allorigins.win/raw?url=',
+                        'https://cors-anywhere.herokuapp.com/',
+                        'https://thingproxy.freeboard.io/fetch/',
+                        'https://api.codetabs.com/v1/proxy?quest='
+                    ];
+                    
+                    const targetUrl = 'http://phongchongthientaihanoi.com/default.aspx?user=0&pro=xemchitiet.F01559&mode=view&id1=xemtheophut&id2=0';
+                    
+                    let response;
+                    let html;
+                    
+                    try {
+                        // Thử từng proxy cho đến khi thành công
+                        for (let i = 0; i < corsProxies.length; i++) {
+                            try {
+                                console.log(`Trying proxy ${i + 1}: ${corsProxies[i]}`);
+                                response = await fetch(corsProxies[i] + encodeURIComponent(targetUrl), {
+                                    method: 'GET',
+                                    headers: {
+                                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                                    }
+                                });
+                                
+                                if (response.ok) {
+                                    html = await response.text();
+                                    console.log(`Proxy ${i + 1} successful`);
+                                    break;
+                                }
+                            } catch (error) {
+                                console.log(`Proxy ${i + 1} failed:`, error.message);
+                                if (i === corsProxies.length - 1) {
+                                    throw new Error('Tất cả CORS proxy đều thất bại');
+                                }
+                            }
+                        }
+                        
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        
+                        const rows = doc.querySelectorAll('table tr');
+                        const newData = [];
+                        
+                        // Tìm header row để xác định vị trí các cột
+                        let headerRow = null;
+                        let minuteColumns = [12];
+
+                        rows.forEach((row, index) => {
+                            const cells = row.querySelectorAll('td, th');
+                            if (cells.length > 10) { // Header row có nhiều cột
+                                headerRow = row;
+                                cells.forEach((cell, cellIndex) => {
+                                    const text = cell.textContent.trim();
+                                    if (text && text.includes("'") && text.length <= 3) { // Các cột phút như "00'", "05'"
+                                        minuteColumns.push(cellIndex);
+                                    }
+                                });
+                            }
+                        });
+
+                        // Nếu không tìm thấy minute columns, sử dụng fallback
+                        if (minuteColumns.length === 0) {
+                            // Giả sử các cột từ 2 đến 13 là minute columns (00', 05', 10', ..., 55')
+                            for (let i = 2; i <= 13; i++) {
+                                minuteColumns.push(i);
+                            }
+                        }
+
+                        // Parse dữ liệu từ các row
+                        rows.forEach((row, index) => {
+                            if (index === 0 || !headerRow) {
+                                return;
+                            }
+
+                            const cells = row.querySelectorAll('td');
+                            if (cells.length >= 3) {
+                                const dateStr = cells[0]?.textContent.trim(); // Cột Ngày
+                                const hourStr = cells[1]?.textContent.trim(); // Cột Giờ
+
+                                if (dateStr && hourStr && dateStr.includes('/') && !isNaN(parseInt(hourStr))) {
+                                    // Parse từng cột phút
+                                    minuteColumns.forEach(columnIndex => {
+                                        const levelStr = cells[columnIndex]?.textContent.trim();
+                                        const level = parseFloat(levelStr);
+
+                                        // console.log(`columnIndex: ${columnIndex} - ${level}`);
+                                        if (columnIndex < 2) {
+                                            return;
+                                        }
+                                        if (!isNaN(level) && levelStr !== '') {
+                                            try {
+                                                // Parse ngày (đã là UTC+7)
+                                                const [day, month, year] = dateStr.split('/');
+                                                const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+
+                                                // Parse giờ và phút
+                                                const hour = parseInt(hourStr);
+                                                const minute = parseInt((columnIndex - 2) * 5);
+
+                                                // Set thời gian cho date object (đã là UTC+7)
+                                                date.setHours(hour, minute, 0, 0);
+
+                                                // Format thời gian (không cần convert timezone vì đã là UTC+7)
+                                                const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+
+                                    newData.push({
+                                                    time: timeString,
+                                                    date: dateStr,
+                                                    level: level,
+                                                    timestamp: date.getTime()
+                                                });
+                                            } catch (e) {
+                                                console.warn('Error parsing date/time:', e);
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                        
+                        if (newData.length > 0) {
+                            // Sắp xếp dữ liệu theo timestamp
+                            newData.sort((a, b) => a.timestamp - b.timestamp);
+
+                            // Thay thế dữ liệu cũ bằng dữ liệu mới, giới hạn 60 điểm
+                            data.value = newData.slice(-60);
+                            // console.log(data.value);
+                            lastUpdate.value = new Date().toLocaleTimeString('vi-VN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: false
+                            });
+                            error.value = null;
+                            // Delay updateChart to avoid rapid calls
+                            setTimeout(() => {
+                                updateChart();
+                            }, 500);
+                        } else {
+                            error.value = 'Không tìm thấy dữ liệu trong bảng';
+                        }
+
+                        loading.value = false;
+                    } catch (err) {
+                        console.error('Error fetching data:', err);
+                        loading.value = false;
+
+                        // Xử lý các loại lỗi khác nhau
+                        if (err.message.includes('CORS proxy')) {
+                            error.value = 'Lỗi CORS: Không thể kết nối đến server qua proxy. Đang sử dụng dữ liệu mẫu.';
+                        } else if (err.message.includes('CORS') || err.message.includes('cross-origin')) {
+                            error.value = 'Lỗi CORS: Không thể truy cập dữ liệu từ server. Đang sử dụng dữ liệu mẫu.';
+                        } else if (err.message.includes('Failed to fetch')) {
+                            error.value = 'Không thể kết nối đến server. Kiểm tra kết nối internet. Đang sử dụng dữ liệu mẫu.';
+                        } else if (err.message.includes('HTTP error')) {
+                            error.value = `Lỗi server: ${err.message}. Đang sử dụng dữ liệu mẫu.`;
+                        } else {
+                            error.value = 'Không thể tải dữ liệu. Vui lòng thử lại sau. Đang sử dụng dữ liệu mẫu.';
+                        }
+
+                        // Nếu có lỗi và chưa có dữ liệu, load dữ liệu mẫu
+                        if (data.value.length === 0) {
+                            console.log('Loading mock data due to error');
+                            loadMockData();
+                        }
+                    }
+                };
+                const loadMockData = () => {
+                    console.log('loadMockData');
+                    // Tạo dữ liệu mẫu cho testing
+                    const now = new Date();
+                    const mockData = [];
+
+                    for (let i = 59; i >= 0; i--) {
+                        const time = new Date(now.getTime() - i * 60000);
+                        const level = 2.5 + Math.sin(i * 0.1) * 0.5 + Math.random() * 0.2;
+
+                        const timeString = time.toLocaleTimeString('vi-VN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                        });
+
+                        const dateString = time.toLocaleDateString('vi-VN', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                        });
+
+                        mockData.push({
+                            time: timeString,
+                            date: dateString,
+                            level: parseFloat(level.toFixed(2)),
+                            timestamp: time.getTime()
+                        });
+                    }
+
+                    data.value = mockData;
+                    lastUpdate.value = now.toLocaleTimeString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    });
+                    error.value = 'Đang sử dụng dữ liệu mẫu (CORS error)';
+                    setTimeout(() => {
+                        updateChart();
+                    }, 500);
+                };
+                const formatTime = (dataPoint) => {
+                    // Format thời gian cho hiển thị trên biểu đồ
+                    if (dataPoint.date && dataPoint.time) {
+                        return `${dataPoint.date} ${dataPoint.time}`;
+                    }
+                    return dataPoint.time || dataPoint.timestamp;
+                };
+
+                const initChart = () => {
+                    console.log('initChart called');
+                    if (chart.value) {
+                        console.log('Chart already exists, destroying old chart');
+                        chart.value.destroy();
+                        chart.value = null;
+                    }
+                    
+                    // Skip annotation plugin for now
+                    
+                    const ctx = chartCanvas.value.getContext('2d');
+                    
+                    // Very simple chart configuration
+                    chart.value = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                label: 'Mực nước (cm)',
+                                data: [],
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                borderWidth: 2,
+                                fill: false,
+                                pointRadius: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: false,
+                            hover: {
+                                animationDuration: 0
+                            },
+                            responsiveAnimationDuration: 0,
+                                legend: {
+                                display: true
+                            },
+                            scales: {
+                                yAxes: [{
+                                    display: true,
+                                    scaleLabel: {
+                                        display: true,
+                                        labelString: 'Mực nước (cm)'
+                                    },
+                                    gridLines: {
+                                        color: function(context) {
+                                            const value = context.tick.value;
+                                            if (value >= 1150) return '#dc2626'; // Critical - Red
+                                            if (value >= 1050) return '#ea580c'; // Danger - Orange
+                                            if (value >= 950) return '#d97706'; // Warning - Yellow
+                                            return '#e5e7eb'; // Normal - Gray
+                                        }
+                                    }
+                                }],
+                                xAxes: [{
+                                    display: true,
+                                    scaleLabel: {
+                                        display: true,
+                                        labelString: 'Thời gian'
+                                    }
+                                }]
+                            }
+                        }
+                    });
+                    
+                    console.log('Chart initialized successfully');
+                };
+                const updateChart = () => {
+                    console.log('updateChart called');
+                    
+                    if (isUpdatingChart.value) {
+                        console.log('Already updating chart, skipping');
+                        return;
+                    }
+                    
+                    if (!chart.value) {
+                        console.log('Chart not initialized, skipping update');
+                        return;
+                    }
+
+                    if (!data.value || data.value.length === 0) {
+                        console.log('No data to update chart');
+                        return;
+                    }
+
+                    isUpdatingChart.value = true;
+
+                    try {
+                        console.log('Updating chart with', data.value.length, 'data points');
+                        
+                        // Simple data validation
+                        const validData = data.value.filter(item => 
+                            item && 
+                            typeof item.level === 'number' && 
+                            !isNaN(item.level)
+                        );
+                        
+                        if (validData.length === 0) {
+                            console.log('No valid data found');
+                            return;
+                        }
+
+                        // Sort data by timestamp
+                        const sortedData = [...validData].sort((a, b) => a.timestamp - b.timestamp);
+                        const recentData = sortedData.slice(-60);
+
+                        // Prepare labels and data
+                        const labels = recentData.map(d => {
+                            if (d.date && d.time) {
+                                return `${d.date} ${d.time}`;
+                            }
+                            return d.time || 'Unknown';
+                        });
+                        
+                        const chartData = recentData.map(d => d.level);
+
+                        // Update chart data
+                        chart.value.data.labels = labels;
+                        chart.value.data.datasets[0].data = chartData;
+
+                        console.log('Chart data prepared, updating...');
+                        
+                        // Simple update without animation
+                        chart.value.update();
+                        console.log('Chart updated successfully');
+                        
+                    } catch (err) {
+                        console.error('Error updating chart:', err);
+                    } finally {
+                        isUpdatingChart.value = false;
+                    }
+                };
+                const stopDataRefresh = () => {
+                    if (dataInterval.value) {
+                        clearInterval(dataInterval.value);
+                        dataInterval.value = null;
+                        console.log('Data refresh stopped');
+                    }
+                };
+
+                const startDataRefresh = () => {
+                    if (!dataInterval.value) {
+                        dataInterval.value = setInterval(() => {
+                            console.log('Interval fetch triggered');
+                            fetchWaterLevel();
+                        }, 60000);
+                        console.log('Data refresh started');
+                    }
+                };
+
+                // Lifecycle hooks
+                onMounted(() => {
+                    console.log('mounted called');
+
+                    // Khởi tạo chart trước
+                    nextTick(() => {
+                        console.log('nextTick called');
+                        if (chartCanvas.value) {
+                            console.log('Canvas found, initializing chart');
+                            initChart();
+
+                            // Fetch dữ liệu sau khi chart đã được khởi tạo
+                            setTimeout(() => {
+                                console.log('Starting data fetch');
+                                fetchWaterLevel();
+                            }, 200);
+                        } else {
+                            console.error('Canvas not found!');
+                        }
+                    });
+
+                    // Set up interval for data refresh
+                    startDataRefresh();
+                });
+
+                onBeforeUnmount(() => {
+                    // Clean up interval when component is destroyed
+                    if (dataInterval.value) {
+                        clearInterval(dataInterval.value);
+                    }
+                    if (chart.value) {
+                        chart.value.destroy();
+                    }
+                });
+
+                // Return all reactive data and methods
+                return {
+                    data,
+                    loading,
+                    error,
+                    lastUpdate,
+                    chartCanvas,
+                    currentLevel,
+                    dataPoints,
+                    alertLevel,
+                    fetchWaterLevel,
+                    loadMockData,
+                    formatTime,
+                    initChart,
+                    updateChart,
+                    stopDataRefresh,
+                    startDataRefresh
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+
+</html>
