@@ -625,35 +625,60 @@
         const { createApp, ref, computed, onMounted, onBeforeUnmount, nextTick, watchEffect } = Vue;
 
         createApp({
+            /**
+             * The main setup function for the Vue application.
+             * @returns {object} The reactive data and methods for the component.
+             */
             setup() {
-                // Reactive data
+                // --- Reactive Data ---
+                /** @type {import('vue').Ref<Array<object>>} */
                 const data = ref([]);
+                /** @type {import('vue').Ref<boolean>} */
                 const loading = ref(true);
+                /** @type {import('vue').Ref<string|null>} */
                 const error = ref(null);
+                /** @type {import('vue').Ref<string|null>} */
                 const lastUpdate = ref(null);
+                /** @type {import('vue').Ref<import('chart.js').Chart|null>} */
                 const chart = ref(null);
+                /** @type {import('vue').Ref<boolean>} */
                 const isUpdatingChart = ref(false);
+                /** @type {import('vue').Ref<number|null>} */
                 const dataInterval = ref(null);
+                /** @type {import('vue').Ref<HTMLCanvasElement|null>} */
                 const chartCanvas = ref(null);
+                /** @type {import('vue').Ref<number>} */
                 const limitData = ref(120);
 
-                // Computed properties
+                // --- Computed Properties ---
+
+                /**
+                 * Gets the latest water level from the data.
+                 * @returns {string} The current water level formatted to two decimal places, or '--' if no data is available.
+                 */
                 const currentLevel = computed(() => {
                     if (data.value.length === 0) return '--';
                     const latestRecord = data.value[data.value.length - 1];
                     return latestRecord.level.toFixed(2);
                 });
 
+                /**
+                 * Gets the total number of data points.
+                 * @returns {number} The number of items in the data array.
+                 */
                 const dataPoints = computed(() => {
                     return data.value.length;
                 });
 
+                /**
+                 * Determines the alert level based on the current water level.
+                 * @returns {{level: string, color: string, icon: string, message: string}} An object containing the alert status.
+                 */
                 const alertLevel = computed(() => {
                     if (data.value.length === 0) return { level: 'unknown', color: 'blue', icon: '?', message: 'Không có dữ liệu' };
 
                     const level = data.value[data.value.length - 1].level;
 
-                    // Định nghĩa các mức báo động theo yêu cầu
                     if (level < 950) {
                         return { level: 'safe', color: 'green', icon: '✓', message: 'An toàn' };
                     } else if (level < 1050) {
@@ -665,16 +690,18 @@
                     }
                 });
 
-                // Methods
+                // --- Methods ---
+
+                /**
+                 * Fetches water level data from the remote server, parses it, and updates the application state.
+                 * @returns {Promise<void>}
+                 */
                 const fetchWaterLevel = async () => {
-
                     const targetUrl = 'https://phongchongthientai.akipham15.workers.dev/search?url=http://phongchongthientaihanoi.com/default.aspx?user=0&pro=xemchitiet.F01559&mode=view&id1=xemtheophut&id2=0';
-
                     let response;
                     let html;
 
                     try {
-                        // Direct fetch to the worker endpoint
                         response = await fetch(targetUrl, {
                             method: 'GET',
                             headers: {
@@ -683,113 +710,77 @@
                             }
                         });
 
-                        if (response.ok) {
-                            html = await response.text();
-                        } else {
-                            throw new Error(`HTTP error: ${response.status}`);
-                        }
+                        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
 
+                        html = await response.text();
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
-
                         const rows = doc.querySelectorAll('table tr');
                         const newData = [];
-
-                        // Tìm header row để xác định vị trí các cột
                         let headerRow = null;
-                        let minuteColumns = [12];
+                        let minuteColumns = [];
 
-                        rows.forEach((row, index) => {
+                        rows.forEach((row) => {
                             const cells = row.querySelectorAll('td, th');
-                            if (cells.length > 10) { // Header row có nhiều cột
+                            if (cells.length > 10) {
                                 headerRow = row;
                                 cells.forEach((cell, cellIndex) => {
                                     const text = cell.textContent.trim();
-                                    if (text && text.includes("'") && text.length <= 3) { // Các cột phút như "00'", "05'"
+                                    if (text && text.includes("'") && text.length <= 3) {
                                         minuteColumns.push(cellIndex);
                                     }
                                 });
                             }
                         });
 
-                        // Nếu không tìm thấy minute columns, sử dụng fallback
                         if (minuteColumns.length === 0) {
-                            // Giả sử các cột từ 2 đến 13 là minute columns (00', 05', 10', ..., 55')
-                            for (let i = 2; i <= 13; i++) {
-                                minuteColumns.push(i);
-                            }
+                            for (let i = 2; i <= 13; i++) minuteColumns.push(i);
                         }
 
-                        // Parse dữ liệu từ các row
                         rows.forEach((row, index) => {
-                            if (index === 0 || !headerRow) {
-                                return;
-                            }
+                            if (index === 0 || !headerRow) return;
 
                             const cells = row.querySelectorAll('td');
-                            if (cells.length >= 3) {
-                                const dateStr = cells[0]?.textContent.trim(); // Cột Ngày
-                                const hourStr = cells[1]?.textContent.trim(); // Cột Giờ
+                            if (cells.length < 3) return;
 
-                                if (dateStr && hourStr && dateStr.includes('/') && !isNaN(parseInt(hourStr))) {
-                                    // Parse từng cột phút
-                                    minuteColumns.forEach(columnIndex => {
-                                        const levelStr = cells[columnIndex]?.textContent.trim();
-                                        const level = parseFloat(levelStr);
+                            const dateStr = cells[0]?.textContent.trim();
+                            const hourStr = cells[1]?.textContent.trim();
 
-                                        // console.log(`columnIndex: ${columnIndex} - ${level}`);
-                                        if (columnIndex < 2) {
-                                            return;
+                            if (dateStr && hourStr && dateStr.includes('/') && !isNaN(parseInt(hourStr))) {
+                                minuteColumns.forEach(columnIndex => {
+                                    if (columnIndex < 2) return;
+                                    const levelStr = cells[columnIndex]?.textContent.trim();
+                                    const level = parseFloat(levelStr);
+
+                                    if (!isNaN(level) && levelStr !== '') {
+                                        try {
+                                            const [day, month, year] = dateStr.split('/');
+                                            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                            const hour = parseInt(hourStr);
+                                            const minute = parseInt((columnIndex - 2) * 5);
+                                            date.setHours(hour, minute, 0, 0);
+                                            const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+
+                                            newData.push({
+                                                time: timeString,
+                                                date: dateStr,
+                                                level: level,
+                                                timestamp: date.getTime()
+                                            });
+                                        } catch (e) {
+                                            console.warn('Error parsing date/time:', e);
                                         }
-                                        if (!isNaN(level) && levelStr !== '') {
-                                            try {
-                                                // Parse ngày (đã là UTC+7)
-                                                const [day, month, year] = dateStr.split('/');
-                                                const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-
-                                                // Parse giờ và phút
-                                                const hour = parseInt(hourStr);
-                                                const minute = parseInt((columnIndex - 2) * 5);
-
-                                                // Set thời gian cho date object (đã là UTC+7)
-                                                date.setHours(hour, minute, 0, 0);
-
-                                                // Format thời gian (không cần convert timezone vì đã là UTC+7)
-                                                const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-
-                                                newData.push({
-                                                    time: timeString,
-                                                    date: dateStr,
-                                                    level: level,
-                                                    timestamp: date.getTime()
-                                                });
-                                            } catch (e) {
-                                                console.warn('Error parsing date/time:', e);
-                                            }
-                                        }
-                                    });
-                                }
+                                    }
+                                });
                             }
                         });
 
                         if (newData.length > 0) {
-                            // Sắp xếp dữ liệu theo timestamp
                             newData.sort((a, b) => a.timestamp - b.timestamp);
-
-                            // Thay thế dữ liệu cũ bằng dữ liệu mới, giới hạn 60 điểm
                             data.value = newData.slice(-1 * limitData.value);
-                            // console.log(data.value);
-                            lastUpdate.value = new Date().toLocaleTimeString('vi-VN', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                second: '2-digit',
-                                hour12: false
-                            });
+                            lastUpdate.value = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
                             error.value = null;
-                            // Delay updateChart to avoid rapid calls
-                            setTimeout(() => {
-                                updateChart();
-                            }, 500);
+                            setTimeout(updateChart, 500);
                         } else {
                             error.value = 'Không tìm thấy dữ liệu trong bảng';
                         }
@@ -798,8 +789,6 @@
                     } catch (err) {
                         console.error('Error fetching data:', err);
                         loading.value = false;
-
-                        // Xử lý các loại lỗi khác nhau
                         if (err.message.includes('Failed to fetch')) {
                             error.value = 'Không thể kết nối đến server. Kiểm tra kết nối internet. Đang sử dụng dữ liệu mẫu.';
                         } else if (err.message.includes('HTTP error')) {
@@ -807,68 +796,48 @@
                         } else {
                             error.value = 'Không thể tải dữ liệu. Vui lòng thử lại sau. Đang sử dụng dữ liệu mẫu.';
                         }
-
-                        // Nếu có lỗi và chưa có dữ liệu, load dữ liệu mẫu
-                        if (data.value.length === 0) {
-                            // loadMockData();
-                        }
                     }
                 };
+
+                /**
+                 * Loads mock data for testing or when the API fails.
+                 */
                 const loadMockData = () => {
-                    // Tạo dữ liệu mẫu cho testing
                     const now = new Date();
                     const mockData = [];
-
                     for (let i = 59; i >= 0; i--) {
                         const time = new Date(now.getTime() - i * 60000);
                         const level = 2.5 + Math.sin(i * 0.1) * 0.5 + Math.random() * 0.2;
-
-                        const timeString = time.toLocaleTimeString('vi-VN', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false
-                        });
-
-                        const dateString = time.toLocaleDateString('vi-VN', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                        });
-
-                        mockData.push({
-                            time: timeString,
-                            date: dateString,
-                            level: parseFloat(level.toFixed(2)),
-                            timestamp: time.getTime()
-                        });
+                        const timeString = time.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                        const dateString = time.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                        mockData.push({ time: timeString, date: dateString, level: parseFloat(level.toFixed(2)), timestamp: time.getTime() });
                     }
-
                     data.value = mockData;
-                    lastUpdate.value = now.toLocaleTimeString('vi-VN', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false
-                    });
+                    lastUpdate.value = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
                     error.value = 'Đang sử dụng dữ liệu mẫu (CORS error)';
-                    setTimeout(() => {
-                        updateChart();
-                    }, 500);
+                    setTimeout(updateChart, 500);
                 };
+
+                /**
+                 * Formats a data point's time for display on the chart.
+                 * @param {object} dataPoint - The data point to format.
+                 * @returns {string} The formatted time string.
+                 */
                 const formatTime = (dataPoint) => {
-                    // Format thời gian cho hiển thị trên biểu đồ
                     if (dataPoint.date && dataPoint.time) {
                         return `${dataPoint.date} ${dataPoint.time}`;
                     }
                     return dataPoint.time || dataPoint.timestamp;
                 };
 
+                /**
+                 * Initializes the chart instance.
+                 */
                 const initChart = () => {
                     if (chart.value) {
                         chart.value.destroy();
                         chart.value = null;
                     }
-
                     const ctx = chartCanvas.value.getContext('2d');
                     chart.value = new Chart(ctx, {
                         type: 'line',
@@ -888,130 +857,64 @@
                             responsive: true,
                             maintainAspectRatio: false,
                             animation: false,
-                            hover: {
-                                animationDuration: 0
-                            },
+                            hover: { animationDuration: 0 },
                             responsiveAnimationDuration: 0,
-                            legend: {
-                                display: true
-                            },
+                            legend: { display: true },
                             scales: {
                                 yAxes: [{
                                     display: true,
-                                    scaleLabel: {
-                                        display: true,
-                                        labelString: 'Mực nước (cm)'
-                                    },
+                                    scaleLabel: { display: true, labelString: 'Mực nước (cm)' },
                                     gridLines: {
                                         color: function (context) {
                                             const value = context.tick.value;
-                                            if (value >= 1150) return '#dc2626'; // Critical - Red
-                                            if (value >= 1050) return '#ea580c'; // Danger - Orange
-                                            if (value >= 950) return '#d97706'; // Warning - Yellow
-                                            return '#e5e7eb'; // Normal - Gray
+                                            if (value >= 1150) return '#dc2626';
+                                            if (value >= 1050) return '#ea580c';
+                                            if (value >= 950) return '#d97706';
+                                            return '#e5e7eb';
                                         }
                                     }
                                 }],
-                                xAxes: [{
-                                    display: true,
-                                    scaleLabel: {
-                                        display: true,
-                                        labelString: 'Thời gian'
-                                    }
-                                }]
+                                xAxes: [{ display: true, scaleLabel: { display: true, labelString: 'Thời gian' } }]
                             },
                             plugins: {
                                 zoom: {
-                                    pan: {
-                                        enabled: true,
-                                        mode: 'x',
-                                        speed: 20,
-                                        threshold: 5,
-                                        modifierKey: null
-                                    },
-                                    zoom: {
-                                        enabled: true,
-                                        mode: 'x',
-                                        speed: 0.5,
-                                        sensitivity: 5,
-                                        limits: {
-                                            x: { min: 0, max: 100 }
-                                        },
-                                        wheel: {
-                                            enabled: true,
-                                            speed: 0.5
-                                        },
-                                        pinch: {
-                                            enabled: true
-                                        },
-                                        drag: {
-                                            enabled: true,
-                                            modifierKey: null
-                                        }
-                                    }
+                                    pan: { enabled: true, mode: 'x', speed: 20, threshold: 5, modifierKey: null },
+                                    zoom: { enabled: true, mode: 'x', speed: 0.5, sensitivity: 5, limits: { x: { min: 0, max: 100 } }, wheel: { enabled: true, speed: 0.5 }, pinch: { enabled: true }, drag: { enabled: true, modifierKey: null } }
                                 }
                             },
-                            interaction: {
-                                intersect: false,
-                                mode: 'index'
-                            }
+                            interaction: { intersect: false, mode: 'index' }
                         }
                     });
                 };
+
+                /**
+                 * Updates the chart with the latest data.
+                 */
                 const updateChart = () => {
-                    if (isUpdatingChart.value) {
+                    if (isUpdatingChart.value || !chart.value || !data.value || data.value.length === 0) {
                         return;
                     }
-
-                    if (!chart.value) {
-                        return;
-                    }
-
-                    if (!data.value || data.value.length === 0) {
-                        return;
-                    }
-
                     isUpdatingChart.value = true;
-
                     try {
-                        // Simple data validation
-                        const validData = data.value.filter(item =>
-                            item &&
-                            typeof item.level === 'number' &&
-                            !isNaN(item.level)
-                        );
-
-                        if (validData.length === 0) {
-                            return;
-                        }
-
-                        // Sort data by timestamp
+                        const validData = data.value.filter(item => item && typeof item.level === 'number' && !isNaN(item.level));
+                        if (validData.length === 0) return;
                         const sortedData = [...validData].sort((a, b) => a.timestamp - b.timestamp);
                         const recentData = sortedData.slice(-1 * limitData.value);
-
-                        // Prepare labels and data
-                        const labels = recentData.map(d => {
-                            if (d.date && d.time) {
-                                return `${d.date} ${d.time}`;
-                            }
-                            return d.time || 'Unknown';
-                        });
-
+                        const labels = recentData.map(d => (d.date && d.time) ? `${d.date} ${d.time}` : (d.time || 'Unknown'));
                         const chartData = recentData.map(d => d.level);
-
-                        // Update chart data
                         chart.value.data.labels = labels;
                         chart.value.data.datasets[0].data = chartData;
-
-                        // Simple update without animation
                         chart.value.update();
-
                     } catch (err) {
                         console.error('Error updating chart:', err);
                     } finally {
                         isUpdatingChart.value = false;
                     }
                 };
+
+                /**
+                 * Stops the automatic data refresh interval.
+                 */
                 const stopDataRefresh = () => {
                     if (dataInterval.value) {
                         clearInterval(dataInterval.value);
@@ -1019,52 +922,52 @@
                     }
                 };
 
+                /**
+                 * Starts the automatic data refresh interval (every 60 seconds).
+                 */
                 const startDataRefresh = () => {
                     if (!dataInterval.value) {
-                        dataInterval.value = setInterval(() => {
-                            fetchWaterLevel();
-                        }, 60000);
+                        dataInterval.value = setInterval(fetchWaterLevel, 60000);
                     }
                 };
 
+                /**
+                 * Handles the change event for the data limit slider. Fetches new data based on the selected limit.
+                 */
                 const onLimitChange = () => {
-                    setTimeout(() => {
-                        fetchWaterLevel();
-                    }, 300);
+                    setTimeout(fetchWaterLevel, 300);
                 };
 
-                // Lifecycle hooks
+                // --- Lifecycle Hooks ---
+
+                /**
+                 * Called after the component is mounted. Fetches initial data and starts the refresh interval.
+                 */
                 onMounted(() => {
-                    setTimeout(() => {
-                        fetchWaterLevel();
-                    }, 200);
-                    // Set up interval for data refresh
+                    setTimeout(fetchWaterLevel, 200);
                     startDataRefresh();
                 });
 
+                /**
+                 * A watcher that initializes the chart once data is available.
+                 */
                 const stopwatchEffect = watchEffect(() => {
                     if (data.value.length > 0) {
-                        nextTick(() => {
-                            initChart();
-                        });
-                        stopwatchEffect();
+                        nextTick(initChart);
+                        stopwatchEffect(); // Stop watching after the chart is initialized
                     }
                 });
 
+                /**
+                 * Called before the component is unmounted. Cleans up intervals and destroys the chart instance to prevent memory leaks.
+                 */
                 onBeforeUnmount(() => {
-                    // Clean up interval when component is destroyed
-                    if (dataInterval.value) {
-                        clearInterval(dataInterval.value);
-                    }
-                    if (chart.value) {
-                        chart.value.destroy();
-                    }
-                    if (stopwatchEffect) {
-                        stopwatchEffect();
-                    }
+                    if (dataInterval.value) clearInterval(dataInterval.value);
+                    if (chart.value) chart.value.destroy();
+                    if (stopwatchEffect) stopwatchEffect();
                 });
 
-                // Return all reactive data and methods
+                // --- Return ---
                 return {
                     data,
                     loading,
