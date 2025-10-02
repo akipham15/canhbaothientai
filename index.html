@@ -8,6 +8,7 @@
     <link rel="icon" href="favicon.ico">
     <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@0.7.7/dist/chartjs-plugin-zoom.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -287,6 +288,82 @@
             margin-bottom: 24px;
         }
 
+        .chart-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .control-group input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #3b82f6;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: #3b82f6;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-group input[type="range"]:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .control-group input[type="range"]:disabled::-webkit-slider-thumb {
+            cursor: not-allowed;
+        }
+
+        .control-group input[type="range"]:disabled::-moz-range-thumb {
+            cursor: not-allowed;
+        }
+
+        .chart-controls button {
+            background: #6b7280;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .chart-controls button:hover:not(:disabled) {
+            background: #4b5563;
+        }
+
+        .chart-controls button:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+        }
+
         .chart-wrapper {
             background: #f9fafb;
             border-radius: 12px;
@@ -454,6 +531,27 @@
         </div>
 
         <div class="chart-container">
+            <div class="chart-controls">
+                <div class="control-group">
+                    <label for="dataLimit" style="font-size: 14px; color: #6b7280; margin-right: 8px;">Data Points:</label>
+                    <input 
+                        id="dataLimit"
+                        v-model="limitData" 
+                        @change="onLimitChange"
+                        type="range" 
+                        min="10" 
+                        max="1000" 
+                        step="10"
+                        style="width: 200px; margin-right: 8px;"
+                        :disabled="loading">
+                    <span style="font-size: 14px; color: #374151; min-width: 40px; text-align: center;">{{ limitData }}</span>
+                </div>
+                <button @click="resetZoom"
+                    style="background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;"
+                    :disabled="loading">
+                    🔍 Reset Zoom
+                </button>
+            </div>
             <div class="chart-wrapper">
                 <div v-if="loading && data.length === 0" class="loading">
                     <div class="spinner"></div>
@@ -499,7 +597,7 @@
             <h2>Thông tin</h2>
             <ul class="info-list">
                 <li>Dữ liệu được cập nhật tự động mỗi phút</li>
-                <li>Biểu đồ hiển thị tối đa 60 điểm dữ liệu gần nhất (1 giờ)</li>
+                <li>Biểu đồ hiển thị tối đa {{ limitData }} điểm dữ liệu gần nhất (1 giờ)</li>
                 <li>Nguồn dữ liệu: Hệ thống phòng chống thiên tai Hà Nội</li>
             </ul>
         </div>
@@ -542,6 +640,7 @@
                 const isUpdatingChart = ref(false);
                 const dataInterval = ref(null);
                 const chartCanvas = ref(null);
+                const limitData = ref(120);
 
                 // Computed properties
                 const currentLevel = computed(() => {
@@ -683,7 +782,7 @@
                             newData.sort((a, b) => a.timestamp - b.timestamp);
 
                             // Thay thế dữ liệu cũ bằng dữ liệu mới, giới hạn 60 điểm
-                            data.value = newData.slice(-60);
+                            data.value = newData.slice(-1 * limitData.value);
                             // console.log(data.value);
                             lastUpdate.value = new Date().toLocaleTimeString('vi-VN', {
                                 hour: '2-digit',
@@ -825,6 +924,29 @@
                                         labelString: 'Thời gian'
                                     }
                                 }]
+                            },
+                            plugins: {
+                                zoom: {
+                                    pan: {
+                                        enabled: true,
+                                        mode: 'x',
+                                        speed: 20,
+                                        threshold: 10
+                                    },
+                                    zoom: {
+                                        enabled: true,
+                                        mode: 'x',
+                                        speed: 1.0,
+                                        sensitivity: 0.001,
+                                        limits: {
+                                            x: { min: 0, max: 100 }
+                                        }
+                                    }
+                                }
+                            },
+                            interaction: {
+                                intersect: false,
+                                mode: 'index'
                             }
                         }
                     });
@@ -858,7 +980,7 @@
 
                         // Sort data by timestamp
                         const sortedData = [...validData].sort((a, b) => a.timestamp - b.timestamp);
-                        const recentData = sortedData.slice(-60);
+                        const recentData = sortedData.slice(-1 * limitData.value);
 
                         // Prepare labels and data
                         const labels = recentData.map(d => {
@@ -896,6 +1018,18 @@
                             fetchWaterLevel();
                         }, 60000);
                     }
+                };
+
+                const resetZoom = () => {
+                    if (chart.value && chart.value.resetZoom) {
+                        chart.value.resetZoom();
+                    }
+                };
+
+                const onLimitChange = () => {
+                    setTimeout(() => {
+                        fetchWaterLevel();
+                    }, 300);
                 };
 
                 // Lifecycle hooks
@@ -939,13 +1073,16 @@
                     currentLevel,
                     dataPoints,
                     alertLevel,
+                    limitData,
                     fetchWaterLevel,
                     loadMockData,
                     formatTime,
                     initChart,
                     updateChart,
                     stopDataRefresh,
-                    startDataRefresh
+                    startDataRefresh,
+                    resetZoom,
+                    onLimitChange
                 };
             }
         }).mount('#app');
