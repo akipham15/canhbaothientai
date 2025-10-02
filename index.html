@@ -290,7 +290,7 @@
 
         .chart-controls {
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
             margin-bottom: 12px;
         }
@@ -546,11 +546,6 @@
                         :disabled="loading">
                     <span style="font-size: 14px; color: #374151; min-width: 40px; text-align: center;">{{ limitData }}</span>
                 </div>
-                <button @click="resetZoom"
-                    style="background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;"
-                    :disabled="loading">
-                    🔍 Reset Zoom
-                </button>
             </div>
             <div class="chart-wrapper">
                 <div v-if="loading && data.length === 0" class="loading">
@@ -931,15 +926,27 @@
                                         enabled: true,
                                         mode: 'x',
                                         speed: 20,
-                                        threshold: 10
+                                        threshold: 5,
+                                        modifierKey: null
                                     },
                                     zoom: {
                                         enabled: true,
                                         mode: 'x',
-                                        speed: 1.0,
-                                        sensitivity: 0.001,
+                                        speed: 0.5,
+                                        sensitivity: 5,
                                         limits: {
                                             x: { min: 0, max: 100 }
+                                        },
+                                        wheel: {
+                                            enabled: true,
+                                            speed: 0.5
+                                        },
+                                        pinch: {
+                                            enabled: true
+                                        },
+                                        drag: {
+                                            enabled: true,
+                                            modifierKey: null
                                         }
                                     }
                                 }
@@ -1020,12 +1027,6 @@
                     }
                 };
 
-                const resetZoom = () => {
-                    if (chart.value && chart.value.resetZoom) {
-                        chart.value.resetZoom();
-                    }
-                };
-
                 const onLimitChange = () => {
                     setTimeout(() => {
                         fetchWaterLevel();
@@ -1081,7 +1082,6 @@
                     updateChart,
                     stopDataRefresh,
                     startDataRefresh,
-                    resetZoom,
                     onLimitChange
                 };
             }
